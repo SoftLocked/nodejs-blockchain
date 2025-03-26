@@ -1,6 +1,6 @@
 const net = require("net");
 
-const PORT = process.argv[2] || 3000;
+let PORT = process.argv[2];
 const peerList = [];
 
 // Spin up server to start listening for connections
@@ -13,7 +13,7 @@ const server = net.createServer((socket) => {
     // Handle incoming messages
     socket.on("data", (data) => {
         console.log(`Recieved: ${data.toString().trim()}`);
-        broadcast(data, socket);
+        //broadcast(data, socket);
     })
 
     // Remove peer if disconnected
@@ -29,6 +29,7 @@ server.listen(PORT, () => {
 })
 
 // Broadcast message to all connected peers except sender
+/*
 function broadcast(message, sender) {
     peerList.forEach((peer) => {
         if (peer !== sender) {
@@ -36,10 +37,11 @@ function broadcast(message, sender) {
         }
     });
 }
+*/
 
 // Connect to other peers
 function connectToPeer(host, port) {
-    const socket = net.createConnection({ host, port }, () => {
+    const socket = net.createConnection({host, port}, () => {
       console.log(`Connected to peer ${host}:${port}`);
       peerList.push(socket);
     });
@@ -54,13 +56,27 @@ function connectToPeer(host, port) {
       console.log(`Error connecting to peer: ${err.message}`);
     });
 }
-  
-// Connect to initial peers if provided
-const initialPeers = process.argv.slice(3);
-initialPeers.forEach((peer) => {
-const [host, port] = peer.split(":");
-connectToPeer(host, parseInt(port, 10));
-});
+
+function connectToBootstrap(host, port) {
+    const socket = net.createConnection({host, port}, () => {
+        console.log(`Connected to bootstrap ${host}:${port}`);
+    });
+
+    socket.write(`0.0.0.0:${PORT}`)
+
+    // Handle incoming messages from bootstrap
+    socket.on("data", (data) => {
+        const [host, port] = data.toString().trim().split(":");
+        connectToPeer(host, parseInt(port, 10));
+    });
+
+    // Handle errors
+    socket.on("error", (err) => {
+        console.log(`Error connecting to bootstrap: ${err.message}`);
+    });
+}
+
+connectToBootstrap("127.0.0.1", parseInt(8080, 10));
 
 // CLI to send messages
 process.stdin.on("data", (data) => {
