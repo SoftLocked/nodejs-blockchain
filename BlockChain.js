@@ -22,8 +22,8 @@ class Block {
             .digest('base64');
     }
 
-    static isDataValid(data) {
-        return crypto.createVerify('sha256').update(JSON.stringify(data.content)).end().verify(crypto.createPublicKey({
+    static isDataValid(index, data) {
+        return crypto.createVerify('sha256').update(index+JSON.stringify(data.content)).end().verify(crypto.createPublicKey({
             key: data.public_key,
             format: 'pem',
             type: 'spki',
@@ -34,6 +34,7 @@ class Block {
 class BlockChain {
     constructor(chain=[]) {
         let temp_bc = this.listToBlockChain(chain)
+        //console.log(temp_bc)
         if (!chain) {
             this.chain = [this.createGenBlock()]
         } else if (!this.isBlockChainValid(temp_bc)) {
@@ -67,7 +68,7 @@ class BlockChain {
 
         let block = new Block(this.chain.length, data, this.getLatestBlock().hash);
 
-        if (!Block.isDataValid(block.data)) {
+        if (!Block.isDataValid(this.chain.length, block.data)) {
             return false;
         }
 
@@ -76,22 +77,19 @@ class BlockChain {
 
     isBlockChainValid(chain) {
         if (chain.length < 1) {
-            console.log('0', 0);
             return false;
         }
         for (let i = 1; i < chain.length; i++) {
             if (chain[i].hash !== chain[i].calcHash()) {
-                console.log('1', i);
                 return false;
             }
 
             if (i > 0 && chain[i].prevHash != chain[i-1].hash) {
-                console.log('2', i);
                 return false;
             }
 
-            if (!Block.isDataValid(chain[i].data)) {
-                console.log('3', i);
+
+            if (!Block.isDataValid(i, chain[i].data)) {
                 return false;
             }
         }
@@ -111,33 +109,39 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
     }
 });
 
-function signData(data, pk, sk) {
+function signData(index, data, pk, sk) {
     return {
         content: data,
         public_key: pk.toString('utf-8'),
         signature: crypto.createSign('sha256')
-                         .update(JSON.stringify(data))
+                         .update(index+JSON.stringify(data))
                          .end()
                          .sign(sk, 'hex')
     }
 }
 
+function displayChainMinimal(chain) {
+    return chain.map((block) => {
+        return block.data.content;
+    });
+}
+
 let bc = new BlockChain()
 
-console.log(bc.chain)
+//console.log(bc.chain)
 
-bc.addBlock(signData({
-    sender: "Alice",
-    receiver: "Bob",
-    amount: 100
-}, publicKey, privateKey))
+bc.addBlock(signData(1, "Piece", publicKey, privateKey))
 
-console.log(bc.chain)
+//console.log('test', bc.chain)
 
 let temp = JSON.parse(JSON.stringify(bc.chain))
 
+//console.log(temp)
+
 new_bc = new BlockChain(temp)
 
-console.log(new_bc.chain)
+new_bc.addBlock(signData(2, "Of Data!", publicKey, privateKey))
+
+console.log(displayChainMinimal(new_bc.chain));
 
 
