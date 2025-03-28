@@ -1,6 +1,6 @@
-const crypto = require('crypto');
+import crypto from 'node:crypto';
 
-class Block {
+export class Block {
     constructor(index, data, prevHash, timestamp=new Date().toISOString(), proofOfWork=null) {
         this.index = index;
         this.timestamp = timestamp;
@@ -9,17 +9,37 @@ class Block {
 
         this.proofOfWork = proofOfWork
 
-        if (this.proofOfWork == null) {
-            // TODO: Prove work here
-        }
+        this.difficulty = 3;
 
         this.hash = this.calcHash();
+
+        if (this.proofOfWork == null) {
+            this.proofOfWork = 0;
+            this.mineBlock();
+        }
+
+        
     }
 
     calcHash() {
         return crypto.createHash('sha256')
             .update(this.index + this.timestamp + JSON.stringify(this.data) + this.proofOfWork + this.prevHash)
             .digest('base64');
+    }
+
+    mineBlock() {
+        console.log(`Mining with difficulty ${this.difficulty} (first ${this.difficulty*6} bits of hash must be 0)...`)
+        const target = '0'.repeat(this.difficulty);
+        while (this.hash.substring(0, this.difficulty) !== target) {
+            //console.log('mining...');
+            this.proofOfWork++;
+            this.hash = this.calcHash();
+        }
+        console.log(`Block mined: ${this.hash} (proofOfWork: ${this.proofOfWork})`);
+    }
+
+    isBlockMined() {
+        return this.hash.substring(0, this.difficulty) === '0'.repeat(this.difficulty);
     }
 
     static isDataValid(index, data) {
@@ -31,17 +51,18 @@ class Block {
     }
 }
 
-class BlockChain {
+export class BlockChain {
     constructor(chain=[]) {
         let temp_bc = this.listToBlockChain(chain)
         //console.log(temp_bc)
         if (!chain) {
             this.chain = [this.createGenBlock()]
-        } else if (!this.isBlockChainValid(temp_bc)) {
+        } else if (!BlockChain.isBlockChainValid(temp_bc)) {
             this.chain = [this.createGenBlock()]
         } else {
             this.chain = temp_bc
         }
+        
     }
 
     listToBlockChain(chain) {
@@ -62,7 +83,7 @@ class BlockChain {
     }
 
     addBlock(data) {
-        if (!this.isBlockChainValid(this.chain)) {
+        if (!BlockChain.isBlockChainValid(this.chain)) {
             return false;
         }
 
@@ -75,7 +96,7 @@ class BlockChain {
         this.chain.push(block)
     }
 
-    isBlockChainValid(chain) {
+    static isBlockChainValid(chain) {
         if (chain.length < 1) {
             return false;
         }
@@ -92,8 +113,30 @@ class BlockChain {
             if (!Block.isDataValid(i, chain[i].data)) {
                 return false;
             }
+
+            if (!chain[i].isBlockMined) {
+                return false;
+            }
         }
         return true;
+    }
+
+    getWork() {
+        let work = 0;
+        for (let i = 1; i < this.chain.length; i++) {
+            work += this.chain[i].proofOfWork;
+        }
+        return work;
+    }
+
+    copyChain() {
+        return new BlockChain(JSON.parse(JSON.stringify(this.chain)))
+    }
+
+    displayChainMinimal() {
+        return this.chain.map((block) => {
+            return block.data.content;
+        });
     }
 }
 
@@ -119,29 +162,5 @@ function signData(index, data, pk, sk) {
                          .sign(sk, 'hex')
     }
 }
-
-function displayChainMinimal(chain) {
-    return chain.map((block) => {
-        return block.data.content;
-    });
-}
-
-let bc = new BlockChain()
-
-//console.log(bc.chain)
-
-bc.addBlock(signData(1, "Piece", publicKey, privateKey))
-
-//console.log('test', bc.chain)
-
-let temp = JSON.parse(JSON.stringify(bc.chain))
-
-//console.log(temp)
-
-new_bc = new BlockChain(temp)
-
-new_bc.addBlock(signData(2, "Of Data!", publicKey, privateKey))
-
-console.log(displayChainMinimal(new_bc.chain));
 
 

@@ -1,8 +1,8 @@
-const net = require("net");
+import net from 'node:net';
 
 const HOST = '127.0.0.1'; // Localhost
 const PORT = 8080;
-clientList = []
+let clientList = []
 
 // Create a TCP server
 const server = net.createServer((socket) => {
